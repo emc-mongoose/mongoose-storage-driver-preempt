@@ -1,0 +1,267 @@
+buildscript {
+	repositories {
+		mavenCentral()
+		maven {
+			url "https://plugins.gradle.org/m2/"
+		}
+	}
+}
+
+plugins {
+	id "java"
+	id "scala"
+	id "signing"
+	id "maven-publish"
+	id "com.bmuschko.docker-remote-api" version "4.0.5"
+	id "com.diffplug.gradle.spotless" version "3.18.0"
+	id "io.codearte.nexus-staging" version "0.20.0"
+	id "de.marcphilipp.nexus-publish" version "0.2.0"
+}
+
+repositories {
+	jcenter()
+	mavenCentral()
+}
+
+description = "Mongoose is a high-load storage performance testing tool"
+group = "com.github.emc-mongoose"
+version = "4.2.0"
+sourceCompatibility = 11
+targetCompatibility = 11
+
+ext {
+	depVersion = [
+		confuse            : "1.2.1",
+		javaCommons        : "2.3.5",
+		junit              : "4.12",
+		log4j              : "2.8.2",
+		mongooseBase       : "4.2.0",
+		scala              : "2.12.6",
+		slf4j              : "1.7.25",
+	]
+	rootPkg = "com.emc.mongoose.storage.driver.preempt"
+	baseJarFileName = "mongoose"
+	javaHome = System.properties["java.home"]
+	jreOutputDir = "${project.buildDir}${File.separator}jre"
+	modulesDepsFilePath = "${project.buildDir}${File.separator}modules.deps"
+}
+
+wrapper {
+	gradleVersion = "4.10.3"
+}
+
+configurations {
+	provided
+	testCompile {
+		extendsFrom(compileOnly, provided)
+	}
+}
+
+sourceSets {
+	main {
+		compileClasspath += configurations.provided
+	}
+}
+
+dependencies {
+	compileOnly(
+		"com.github.emc-mongoose:mongoose-base:${depVersion.mongooseBase}",
+		"com.github.akurilov:confuse:${depVersion.confuse}",
+		"com.github.akurilov:java-commons:${depVersion.javaCommons}",
+		"org.apache.logging.log4j:log4j-api:${depVersion.log4j}",
+		"org.apache.logging.log4j:log4j-core:${depVersion.log4j}",
+	)
+
+	testCompile(
+		"junit:junit:${depVersion.junit}",
+		"org.scala-lang:scala-compiler:${depVersion.scala}",
+		"org.scala-lang:scala-library:${depVersion.scala}",
+		"com.github.docker-java:docker-java:[3,)",
+	)
+}
+
+test {
+	useJUnit()
+	exclude "com/emc/mongoose/integration/*"
+	jvmArgs "-XX:MaxDirectMemorySize=2g"
+	jvmArgs "-XX:+HeapDumpOnOutOfMemoryError"
+	maxHeapSize "2g"
+	testLogging {
+		events = [
+			"standardOut", "skipped", "started", "failed",
+		]
+		showExceptions = true
+		showStandardStreams = true
+	}
+}
+
+task integrationTest(type: Test) {
+	useJUnit()
+	include "com/emc/mongoose/integration/*"
+	exclude "**/RollingAppenderTest*"
+	jvmArgs "-XX:MaxDirectMemorySize=2g"
+	jvmArgs "-XX:+HeapDumpOnOutOfMemoryError"
+	maxHeapSize "2g"
+	testLogging {
+		events = [
+			"standardOut", "skipped", "started", "failed",
+		]
+		showExceptions = true
+		showStandardStreams = true
+	}
+}
+
+
+jar {
+	duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+	excludes = [
+		"**/*.css",
+		"**/*.html",
+		"META-INF/*.DSA",
+		"META-INF/*.LIST",
+		"META-INF/*.RSA",
+		"META-INF/*.SF",
+		"OSGI-INF/*",
+		"module-info.class",
+	]
+	manifest {
+		attributes(
+			"Automatic-Module-Name": rootPkg,
+			"Implementation-Title": project.name,
+			"Implementation-Version": project.version,
+		)
+	}
+	from configurations.provided.collect {
+		it.isDirectory() ? it : zipTree(it)
+	}
+}
+
+javadoc {
+	failOnError = false
+	classpath += configurations.provided
+}
+
+task javadocJar(type: Jar, dependsOn: javadoc) {
+	classifier = "javadoc"
+	from javadoc.destinationDir
+}
+
+task sourcesJar(type: Jar, dependsOn: classes) {
+	classifier = "sources"
+	from sourceSets.main.allSource
+}
+
+// Maven Central deployment ////////////////////////////////////////////////////////////////////////////////////////////
+
+artifacts {
+	archives jar
+	archives sourcesJar
+	archives javadocJar
+}
+
+nexusStaging {
+	packageGroup = project.group
+	username = project.hasProperty("ossrhUsername") ? project.property("ossrhUsername") : null
+	password = project.hasProperty("ossrhPassword") ? project.property("ossrhPassword") : null
+	//stagingProfileId = "491ac45c9daed9"
+	numberOfRetries = 100
+	delayBetweenRetriesInMillis = 10000
+}
+
+publishing {
+	publications {
+		mavenJava(MavenPublication) {
+			artifactId = project.name
+			groupId = project.group
+			artifact jar
+			artifact javadocJar
+			artifact sourcesJar
+			pom {
+				name = project.name
+				description = project.description
+				url = "https://github.com/emc-mongoose/mongoose-storage-driver-preempt"
+				scm {
+					connection = "https://github.com/emc-mongoose/mongoose-storage-driver-preempt.git"
+					developerConnection = "https://github.com/emc-mongoose/mongoose-storage-driver-preempt.git"
+					url = "https://github.com/emc-mongoose/mongoose-storage-driver-preempt.git"
+				}
+				licenses {
+					license {
+						name = "The MIT License (MIT)"
+						url = "https://github.com/emc-mongoose/mongoose-storage-driver-preempt/LICENSE"
+					}
+				}
+				developers {
+					developer {
+						id = "akurilov"
+						name = "Andrey Kurilov"
+						email = "akurilov123@gmail.com"
+					}
+				}
+			}
+		}
+	}
+	repositories {
+		maven {
+			url = "https://oss.sonatype.org/service/local/staging/deploy/maven2/"
+			credentials {
+				username = project.hasProperty("ossrhUsername") ? project.property("ossrhUsername") : null
+				password = project.hasProperty("ossrhPassword") ? project.property("ossrhPassword") : null
+			}
+		}
+	}
+}
+
+signing {
+	sign publishing.publications
+}
+
+task releaseToMavenCentral {
+	dependsOn += publishToNexus
+	dependsOn += closeAndReleaseRepository
+}
+
+// Docker tasks ////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+import com.bmuschko.gradle.docker.tasks.image.*
+import com.bmuschko.gradle.docker.tasks.container.*
+
+task dockerBuildImage(type: DockerBuildImage) {
+	inputDir = project.projectDir
+	buildArgs = [
+		"BASE_VERSION": depVersion.mongooseBase,
+		"VERSION": version,
+	]
+	dockerFile = project.file("ci${File.separator}docker${File.separator}Dockerfile")
+	imageId = "emcmongoose/${project.name}".toString()
+	tags = [
+		"emcmongoose/${project.name}:${version}",
+		"emcmongoose/${project.name}:testing",
+	]
+}
+
+task dockerPushProductionImage(type: DockerPushImage) {
+	imageName = "emcmongoose/${project.name}".toString()
+	tag = "emcmongoose/${project.name}:${version}".toString()
+}
+
+task dockerPushTestingImage(type: DockerPushImage, dependsOn: dockerBuildImage) {
+	imageName = "emcmongoose/${project.name}".toString()
+	tag = "emcmongoose/${project.name}:testing".toString()
+}
+
+// Code Formatting /////////////////////////////////////////////////////////////////////////////////////////////////////
+
+spotless {
+	format "misc", {
+		target "**/*.gradle", "**/*.js", "**/*.groovy", "**/*.py", "**/*.scala"
+		indentWithTabs()
+		endWithNewline()
+	}
+	java {
+		target "**/*.java"
+		endWithNewline()
+		removeUnusedImports()
+		eclipse().configFile "spotless.eclipseformat.xml"
+	}
+}
