@@ -8,4 +8,4 @@
 
 # Contents
 
-TODO
+Preemptive multitasking (native threads pool) based storage driver. Uses thread-per-task approach for I/O.
