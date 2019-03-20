@@ -13,4 +13,7 @@ ARG BASE_VERSION
 ARG VERSION
 RUN mkdir -p $HOME/.mongoose/${BASE_VERSION}/ext
 COPY --from=0 /build/libs/mongoose-storage-driver-preempt-${VERSION}.jar /tmp/
-RUN mv -f /tmp/mongoose-storage-driver-preempt-*.jar $HOME/.mongoose/${BASE_VERSION}/ext/
+ADD ci/docker/entrypoint_storage_driver_preempt.sh /opt/mongoose/entrypoint_storage_driver_preempt.sh
+RUN mv -f /tmp/mongoose-storage-driver-preempt-*.jar $HOME/.mongoose/${BASE_VERSION}/ext/; \
+    chmod +x /opt/mongoose/entrypoint_storage_driver_preempt.sh
+ENTRYPOINT ["/opt/mongoose/entrypoint_storage_driver_preempt.sh"]
