@@ -31,15 +31,6 @@ public abstract class PreemptStorageDriverBase<I extends Item, O extends Operati
 					final boolean verifyFlag)
 					throws IllegalConfigurationException {
 		super(stepId, itemDataInput, storageConfig, verifyFlag);
-		if (ioWorkerCount != concurrencyLimit) {
-			throw new IllegalArgumentException(
-							"Storage driver I/O worker count ("
-											+ ioWorkerCount
-											+ ") should be equal to the "
-											+ " concurrency limit ("
-											+ concurrencyLimit
-											+ ")");
-		}
 		final int inQueueSize = storageConfig.intVal("driver-limit-queue-input");
 		ioExecutor = new ThreadPoolExecutor(
 						ioWorkerCount,
@@ -71,9 +62,14 @@ public abstract class PreemptStorageDriverBase<I extends Item, O extends Operati
 		}
 		int i = from;
 		try {
-			while (i < to) {
-				ioExecutor.execute(wrapToBlocking(ops.get(i)));
-				i++;
+			if(isBatch(ops, from, to)) {
+				ioExecutor.execute(wrapToBlocking(ops, from, to));
+				i = to;
+			} else {
+				while (i < to) {
+					ioExecutor.execute(wrapToBlocking(ops.get(i)));
+					i++;
+				}
 			}
 		} catch (final RejectedExecutionException ignored) {}
 		return i - from;
@@ -98,7 +94,23 @@ public abstract class PreemptStorageDriverBase<I extends Item, O extends Operati
 		}
 	}
 
+	private Runnable wrapToBlocking(final List<O> ops, final int from, final int to) {
+		for(var i = from; i < to; i ++) {
+			prepare(ops.get(i));
+		}
+		return () -> {
+			execute(ops, from, to);
+			for(var i = from; i < to; i ++) {
+				handleCompleted(ops.get(i));
+			}
+		};
+	}
+
+	protected abstract boolean isBatch(final List<O> ops, final int from, final int to);
+
 	protected abstract void execute(final O op);
+
+	protected abstract void execute(final List<O> ops, final int from, final int to);
 
 	@Override
 	public final int activeOpCount() {

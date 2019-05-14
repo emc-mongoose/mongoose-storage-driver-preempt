@@ -31,6 +31,11 @@ public class PreemptStorageDriverMock<I extends Item, O extends Operation<I>>
 	}
 
 	@Override
+	protected boolean isBatch(final List<O> ops, final int from, final int to) {
+		return true;
+	}
+
+	@Override
 	protected void execute(final O op) {
 		op.startRequest();
 		op.finishRequest();
@@ -67,6 +72,13 @@ public class PreemptStorageDriverMock<I extends Item, O extends Operation<I>>
 		}
 		op.finishResponse();
 		op.status(Operation.Status.SUCC);
+	}
+
+	@Override
+	protected void execute(final List<O> ops, final int from, final int to) {
+		for(var i = from; i < to; i ++) {
+			execute(ops.get(i));
+		}
 	}
 
 	@Override
