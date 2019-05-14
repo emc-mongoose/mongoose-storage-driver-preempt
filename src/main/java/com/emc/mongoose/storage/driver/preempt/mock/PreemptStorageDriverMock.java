@@ -72,6 +72,7 @@ public class PreemptStorageDriverMock<I extends Item, O extends Operation<I>>
 		}
 		op.finishResponse();
 		op.status(Operation.Status.SUCC);
+		handleCompleted(op);
 	}
 
 	@Override

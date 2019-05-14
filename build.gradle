@@ -25,7 +25,7 @@ repositories {
 
 description = "Mongoose is a high-load storage performance testing tool"
 group = "com.github.emc-mongoose"
-version = "4.2.10"
+version = "4.2.11"
 sourceCompatibility = 11
 targetCompatibility = 11
 
@@ -163,7 +163,6 @@ nexusStaging {
 	packageGroup = project.group
 	username = project.hasProperty("ossrhUsername") ? project.property("ossrhUsername") : null
 	password = project.hasProperty("ossrhPassword") ? project.property("ossrhPassword") : null
-	//stagingProfileId = "491ac45c9daed9"
 	numberOfRetries = 100
 	delayBetweenRetriesInMillis = 10000
 }

@@ -84,12 +84,10 @@ public abstract class PreemptStorageDriverBase<I extends Item, O extends Operati
 		if (prepare(op)) {
 			return () -> {
 				execute(op);
-				handleCompleted(op);
 			};
 		} else {
 			return () -> {
 				op.status(Status.FAIL_UNKNOWN);
-				handleCompleted(op);
 			};
 		}
 	}
@@ -100,16 +98,23 @@ public abstract class PreemptStorageDriverBase<I extends Item, O extends Operati
 		}
 		return () -> {
 			execute(ops, from, to);
-			for(var i = from; i < to; i ++) {
-				handleCompleted(ops.get(i));
-			}
 		};
 	}
 
 	protected abstract boolean isBatch(final List<O> ops, final int from, final int to);
 
+	/**
+	 * Should invoke or schedule handleCompleted call
+	 * @param op
+	 */
 	protected abstract void execute(final O op);
 
+	/**
+	 * Should invoke or scheduled handleCompleted call for each operation
+	 * @param ops
+	 * @param from
+	 * @param to
+	 */
 	protected abstract void execute(final List<O> ops, final int from, final int to);
 
 	@Override
