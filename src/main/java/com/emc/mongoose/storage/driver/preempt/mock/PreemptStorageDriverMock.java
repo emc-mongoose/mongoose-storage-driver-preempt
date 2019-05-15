@@ -76,8 +76,8 @@ public class PreemptStorageDriverMock<I extends Item, O extends Operation<I>>
 	}
 
 	@Override
-	protected void execute(final List<O> ops, final int from, final int to) {
-		for(var i = from; i < to; i ++) {
+	protected void execute(final List<O> ops) {
+		for(var i = 0; i < ops.size(); i ++) {
 			execute(ops.get(i));
 		}
 	}
