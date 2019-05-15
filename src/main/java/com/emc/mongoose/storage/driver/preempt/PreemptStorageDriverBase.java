@@ -13,6 +13,7 @@ import com.emc.mongoose.base.storage.driver.StorageDriver;
 import com.emc.mongoose.base.storage.driver.StorageDriverBase;
 import com.github.akurilov.confuse.Config;
 import java.io.EOFException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
@@ -93,12 +94,15 @@ public abstract class PreemptStorageDriverBase<I extends Item, O extends Operati
 	}
 
 	private Runnable wrapToBlocking(final List<O> ops, final int from, final int to) {
+		// should copy the ops into the other buffer as far as invoker will clean the source buffer after put(...) exit
+		final var opsRangeCopy = new ArrayList<O>();
+		O op;
 		for(var i = from; i < to; i ++) {
-			prepare(ops.get(i));
+			op = ops.get(i);
+			prepare(op);
+			opsRangeCopy.add(op);
 		}
-		return () -> {
-			execute(ops, from, to);
-		};
+		return () -> execute(opsRangeCopy);
 	}
 
 	protected abstract boolean isBatch(final List<O> ops, final int from, final int to);
@@ -112,10 +116,8 @@ public abstract class PreemptStorageDriverBase<I extends Item, O extends Operati
 	/**
 	 * Should invoke or scheduled handleCompleted call for each operation
 	 * @param ops
-	 * @param from
-	 * @param to
 	 */
-	protected abstract void execute(final List<O> ops, final int from, final int to);
+	protected abstract void execute(final List<O> ops);
 
 	@Override
 	public final int activeOpCount() {
