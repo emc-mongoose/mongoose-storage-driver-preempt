@@ -8,6 +8,7 @@ import com.emc.mongoose.base.item.op.data.DataOperation;
 import com.emc.mongoose.base.item.DataItem;
 import com.emc.mongoose.base.item.Item;
 import com.emc.mongoose.base.item.ItemFactory;
+import com.emc.mongoose.base.logging.LogContextThreadFactory;
 import com.emc.mongoose.base.storage.Credential;
 import com.emc.mongoose.storage.driver.preempt.PreemptStorageDriverBase;
 
@@ -18,11 +19,17 @@ import com.github.akurilov.confuse.Config;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.ThreadFactory;
 
 public class PreemptStorageDriverMock<I extends Item, O extends Operation<I>>
 				extends PreemptStorageDriverBase<I, O> {
 
 	private final Random rnd = new Random();
+
+	@Override
+	protected final ThreadFactory ioWorkerThreadFactory() {
+		return new LogContextThreadFactory(stepId, true);
+	}
 
 	public PreemptStorageDriverMock(
 					final String stepId, final DataInput itemDataInput, final Config storageConfig, final boolean verifyFlag) throws

@@ -26,7 +26,7 @@ public abstract class PreemptStorageDriverBase<I extends Item, O extends Operati
 
 	private final ThreadPoolExecutor ioExecutor;
 
-	abstract ThreadFactory ioWorkerThreadFactory();
+	protected abstract ThreadFactory ioWorkerThreadFactory();
 
 	protected PreemptStorageDriverBase(
 					final String stepId,
