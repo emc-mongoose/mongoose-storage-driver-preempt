@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
@@ -24,6 +25,8 @@ public abstract class PreemptStorageDriverBase<I extends Item, O extends Operati
 				extends StorageDriverBase<I, O> implements StorageDriver<I, O> {
 
 	private final ThreadPoolExecutor ioExecutor;
+
+	abstract ThreadFactory ioWorkerThreadFactory();
 
 	protected PreemptStorageDriverBase(
 					final String stepId,
@@ -39,7 +42,7 @@ public abstract class PreemptStorageDriverBase<I extends Item, O extends Operati
 						0,
 						TimeUnit.SECONDS,
 						new ArrayBlockingQueue<>(inQueueSize),
-						new LogContextThreadFactory("io-executor-" + stepId, true));
+						ioWorkerThreadFactory());
 	}
 
 	@Override
