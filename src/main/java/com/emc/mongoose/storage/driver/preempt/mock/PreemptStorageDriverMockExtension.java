@@ -31,7 +31,7 @@ public class PreemptStorageDriverMockExtension<I extends Item, O extends Operati
 	public T create(
 					final String stepId, final DataInput dataInput, final Config storageConfig, final boolean verifyFlag,
 					final int batchSize) throws IllegalConfigurationException, InterruptedException {
-		return (T) new PreemptStorageDriverMock<>(stepId, dataInput, storageConfig, verifyFlag);
+		return (T) new PreemptStorageDriverMock<>(stepId, dataInput, storageConfig, verifyFlag, batchSize);
 	}
 
 	@Override
