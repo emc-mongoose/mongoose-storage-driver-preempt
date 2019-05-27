@@ -7,7 +7,6 @@ import com.emc.mongoose.base.config.IllegalConfigurationException;
 import com.emc.mongoose.base.item.Item;
 import com.emc.mongoose.base.item.op.Operation;
 import com.emc.mongoose.base.item.op.Operation.Status;
-import com.emc.mongoose.base.logging.LogContextThreadFactory;
 import com.emc.mongoose.base.logging.Loggers;
 import com.emc.mongoose.base.storage.driver.StorageDriver;
 import com.emc.mongoose.base.storage.driver.StorageDriverBase;
@@ -24,6 +23,8 @@ import java.util.concurrent.TimeUnit;
 public abstract class PreemptStorageDriverBase<I extends Item, O extends Operation<I>>
 				extends StorageDriverBase<I, O> implements StorageDriver<I, O> {
 
+	public static final int BATCH_MODE_INPUT_OP_COUNT_LIMIT = 1_000_000;
+
 	private final ThreadPoolExecutor ioExecutor;
 
 	protected abstract ThreadFactory ioWorkerThreadFactory();
@@ -32,10 +33,26 @@ public abstract class PreemptStorageDriverBase<I extends Item, O extends Operati
 					final String stepId,
 					final DataInput itemDataInput,
 					final Config storageConfig,
-					final boolean verifyFlag)
+					final boolean verifyFlag,
+					final int batchSize)
 					throws IllegalConfigurationException {
 		super(stepId, itemDataInput, storageConfig, verifyFlag);
-		final int inQueueSize = storageConfig.intVal("driver-limit-queue-input");
+		final var inQueueSize = storageConfig.intVal("driver-limit-queue-input");
+		final var outQueueSize = storageConfig.intVal("driver-limit-queue-output");
+		final var maxOpCount = inQueueSize * batchSize;
+		if(maxOpCount > outQueueSize) {
+			Loggers.ERR.warn(
+				"The product of the batch size and input queue size (" + maxOpCount + ") is greater than the output " +
+					"queue size (" + outQueueSize + ") which may cause the load operation results handling failures, " +
+					"please consider tuning"
+			);
+		}
+		if(BATCH_MODE_INPUT_OP_COUNT_LIMIT < maxOpCount) {
+			Loggers.ERR.warn(
+				"The product of the batch size and input queue size is " + maxOpCount + " which may cause out of " +
+					"memory, please consider tuning"
+			);
+		}
 		ioExecutor = new ThreadPoolExecutor(
 						ioWorkerCount,
 						ioWorkerCount,
