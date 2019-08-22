@@ -38,15 +38,7 @@ public abstract class PreemptStorageDriverBase<I extends Item, O extends Operati
 					throws IllegalConfigurationException {
 		super(stepId, itemDataInput, storageConfig, verifyFlag);
 		final var inQueueSize = storageConfig.intVal("driver-limit-queue-input");
-		final var outQueueSize = storageConfig.intVal("driver-limit-queue-output");
 		final var maxOpCount = inQueueSize * batchSize;
-		if(maxOpCount > outQueueSize) {
-			Loggers.ERR.warn(
-				"The product of the batch size and input queue size (" + maxOpCount + ") is greater than the output " +
-					"queue size (" + outQueueSize + ") which may cause the load operation results handling failures, " +
-					"please consider tuning"
-			);
-		}
 		if(BATCH_MODE_INPUT_OP_COUNT_LIMIT < maxOpCount) {
 			Loggers.ERR.warn(
 				"The product of the batch size and input queue size is " + maxOpCount + " which may cause out of " +
