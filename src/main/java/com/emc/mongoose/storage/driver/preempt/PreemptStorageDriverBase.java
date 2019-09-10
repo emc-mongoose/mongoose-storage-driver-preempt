@@ -153,14 +153,13 @@ public abstract class PreemptStorageDriverBase<I extends Item, O extends Operati
 	protected void doShutdown() {
 		// prevent enqueuing new load operations
 		ioExecutor.shutdown();
-		// drop all pending load operations
-		incomingOps.clear();
 		Loggers.MSG.debug("{}: shut down", toString());
 	}
 
 	@Override
 	protected void doStop()  {
 		Loggers.MSG.debug("{}: interrupting...", toString());
+		incomingOps.clear(); // drop all internally pending load operations
 		try {
 			if (ioExecutor.awaitTermination(1, TimeUnit.SECONDS)) {
 				Loggers.MSG.debug("{}: interrupting finished in 1 seconds", toString());
