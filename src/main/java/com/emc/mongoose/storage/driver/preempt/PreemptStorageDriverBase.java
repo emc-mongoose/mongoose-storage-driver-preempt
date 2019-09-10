@@ -15,6 +15,7 @@ import java.io.EOFException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -26,6 +27,7 @@ public abstract class PreemptStorageDriverBase<I extends Item, O extends Operati
 	public static final int BATCH_MODE_INPUT_OP_COUNT_LIMIT = 1_000_000;
 
 	private final ThreadPoolExecutor ioExecutor;
+	private final BlockingQueue<Runnable> incomingOps;
 
 	protected abstract ThreadFactory ioWorkerThreadFactory();
 
@@ -45,46 +47,40 @@ public abstract class PreemptStorageDriverBase<I extends Item, O extends Operati
 					"memory, please consider tuning"
 			);
 		}
+		incomingOps = new ArrayBlockingQueue<>(inQueueSize);
 		ioExecutor = new ThreadPoolExecutor(
 						ioWorkerCount,
 						ioWorkerCount,
 						0,
 						TimeUnit.SECONDS,
-						new ArrayBlockingQueue<>(inQueueSize),
+						incomingOps,
 						ioWorkerThreadFactory());
 	}
 
 	@Override
 	public final boolean put(final O op)  {
-		try {
-			ioExecutor.execute(wrapToBlocking(op));
-			return true;
-		} catch (final RejectedExecutionException e) {
-			if (!isStarted() || ioExecutor.isShutdown() || ioExecutor.isTerminated()) {
-				throwUnchecked(new EOFException());
-			}
-			return false;
+		if(!isStarted()) {
+			throwUnchecked(new EOFException());
 		}
+		return incomingOps.offer(wrapToBlocking(op));
 	}
 
 	@Override
-	public final int put(final List<O> ops, final int from, final int to)
-					 {
-		if (!isStarted() || ioExecutor.isShutdown() || ioExecutor.isTerminated()) {
+	public final int put(final List<O> ops, final int from, final int to) {
+		if(!isStarted()) {
 			throwUnchecked(new EOFException());
 		}
 		int i = from;
-		try {
-			if(isBatch(ops, from, to)) {
-				ioExecutor.execute(wrapToBlocking(ops, from, to));
+		if(isBatch(ops, from, to)) {
+			if(incomingOps.offer(wrapToBlocking(ops, from, to))) {
 				i = to;
-			} else {
-				while (i < to) {
-					ioExecutor.execute(wrapToBlocking(ops.get(i)));
-					i++;
-				}
 			}
-		} catch (final RejectedExecutionException ignored) {}
+		} else {
+			while(i < to) {
+				incomingOps.offer(wrapToBlocking(ops.get(i)));
+				i ++;
+			}
+		}
 		return i - from;
 	}
 
@@ -95,13 +91,9 @@ public abstract class PreemptStorageDriverBase<I extends Item, O extends Operati
 
 	private Runnable wrapToBlocking(final O op)  {
 		if (prepare(op)) {
-			return () -> {
-				execute(op);
-			};
+			return () -> execute(op);
 		} else {
-			return () -> {
-				op.status(Status.FAIL_UNKNOWN);
-			};
+			return () -> op.status(Status.FAIL_UNKNOWN);
 		}
 	}
 
@@ -162,7 +154,7 @@ public abstract class PreemptStorageDriverBase<I extends Item, O extends Operati
 		// prevent enqueuing new load operations
 		ioExecutor.shutdown();
 		// drop all pending load operations
-		ioExecutor.getQueue().clear();
+		incomingOps.clear();
 		Loggers.MSG.debug("{}: shut down", toString());
 	}
 
