@@ -1,5 +1,6 @@
 package com.emc.mongoose.storage.driver.preempt;
 
+import static com.emc.mongoose.base.item.op.Operation.Status.FAIL_UNKNOWN;
 import static com.github.akurilov.commons.lang.Exceptions.throwUnchecked;
 
 import com.emc.mongoose.base.data.DataInput;
@@ -52,7 +53,7 @@ public abstract class PreemptStorageDriverBase<I extends Item, O extends Operati
 		final var ioWorkerThreadFactory = ioWorkerThreadFactory();
 		for(var i = 0; i < ioWorkerCount; i ++) {
 			final var ioWorkerTask = new WorkerTask<>(
-				batchSize, incomingOps, this::execute, this::execute, this::state
+				batchSize, incomingOps, this::prepareAndExecute, this::prepareAndExecuteBatch, this::state
 			);
 			final var ioWorker = ioWorkerThreadFactory.newThread(ioWorkerTask);
 			ioWorkers.add(ioWorker);
@@ -88,6 +89,27 @@ public abstract class PreemptStorageDriverBase<I extends Item, O extends Operati
 	@Override
 	public final int put(final List<O> ops)  {
 		return put(ops, 0, ops.size());
+	}
+
+	final void prepareAndExecute(final O op) {
+		if(prepare(op)) {
+			execute(op);
+		} else {
+			op.status(FAIL_UNKNOWN);
+		}
+	}
+
+	final void prepareAndExecuteBatch(final List<O> ops) {
+		// should copy the ops into the other buffer as far as invoker will clean the source buffer after put(...) exit
+		final var n = ops.size();
+		final var opsRangeCopy = new ArrayList<O>(n);
+		O op;
+		for(var i = 0; i < n; i ++) {
+			op = ops.get(i);
+			prepare(op);
+			opsRangeCopy.add(op);
+		}
+		execute(opsRangeCopy);
 	}
 
 	/**
