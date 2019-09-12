@@ -40,11 +40,6 @@ public class PreemptStorageDriverMock<I extends Item, O extends Operation<I>>
 	}
 
 	@Override
-	protected boolean isBatch(final List<O> ops, final int from, final int to) {
-		return true;
-	}
-
-	@Override
 	protected void execute(final O op) {
 		op.startRequest();
 		op.finishRequest();
