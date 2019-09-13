@@ -125,6 +125,12 @@ public abstract class PreemptStorageDriverBase<I extends Item, O extends Operati
 	protected abstract void execute(final List<O> ops);
 
 	@Override
+	protected boolean handleCompleted(final O op) {
+		completedOpCount.increment();
+		return super.handleCompleted(op);
+	}
+
+	@Override
 	public final int activeOpCount() {
 		return (int) (scheduledOpCount() - completedOpCount() - incomingOps.size());
 	}
