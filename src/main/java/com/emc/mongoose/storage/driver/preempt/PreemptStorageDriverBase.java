@@ -23,8 +23,6 @@ import java.util.concurrent.atomic.LongAdder;
 public abstract class PreemptStorageDriverBase<I extends Item, O extends Operation<I>>
 				extends StorageDriverBase<I, O> implements StorageDriver<I, O> {
 
-	public static final int BATCH_MODE_INPUT_OP_COUNT_LIMIT = 1_000_000;
-
 	private final BlockingQueue<O> incomingOps;
 	private final List<Thread> ioWorkers;
 	private final LongAdder scheduledOpCount = new LongAdder();
@@ -41,13 +39,6 @@ public abstract class PreemptStorageDriverBase<I extends Item, O extends Operati
 					throws IllegalConfigurationException {
 		super(stepId, itemDataInput, storageConfig, verifyFlag);
 		final var inQueueSize = storageConfig.intVal("driver-limit-queue-input");
-		final var maxOpCount = inQueueSize * batchSize;
-		if(BATCH_MODE_INPUT_OP_COUNT_LIMIT < maxOpCount) {
-			Loggers.ERR.warn(
-				"The product of the batch size and input queue size is " + maxOpCount + " which may cause out of " +
-					"memory, please consider tuning"
-			);
-		}
 		incomingOps = new ArrayBlockingQueue<>(inQueueSize);
 		ioWorkers = new ArrayList<>(ioWorkerCount);
 		final var ioWorkerThreadFactory = ioWorkerThreadFactory();
