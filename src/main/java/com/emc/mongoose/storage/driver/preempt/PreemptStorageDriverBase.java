@@ -14,8 +14,9 @@ import com.github.akurilov.confuse.Config;
 import java.io.EOFException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.LongAdder;
@@ -23,7 +24,8 @@ import java.util.concurrent.atomic.LongAdder;
 public abstract class PreemptStorageDriverBase<I extends Item, O extends Operation<I>>
 				extends StorageDriverBase<I, O> implements StorageDriver<I, O> {
 
-	private final BlockingQueue<O> incomingOps;
+	private final Queue<List<O>> incomingOps;
+	private final Semaphore incomingOpsLimiter;
 	private final List<Thread> ioWorkers;
 	private final LongAdder scheduledOpCount = new LongAdder();
 	private final LongAdder completedOpCount = new LongAdder();
@@ -38,13 +40,14 @@ public abstract class PreemptStorageDriverBase<I extends Item, O extends Operati
 					final int batchSize)
 					throws IllegalConfigurationException {
 		super(stepId, itemDataInput, storageConfig, verifyFlag);
+		incomingOps = new ConcurrentLinkedQueue<>();
 		final var inQueueSize = storageConfig.intVal("driver-limit-queue-input");
-		incomingOps = new ArrayBlockingQueue<>(inQueueSize);
+		incomingOpsLimiter = new Semaphore(inQueueSize);
 		ioWorkers = new ArrayList<>(ioWorkerCount);
 		final var ioWorkerThreadFactory = ioWorkerThreadFactory();
 		for(var i = 0; i < ioWorkerCount; i ++) {
 			final var ioWorkerTask = new WorkerTask<>(
-				batchSize, incomingOps, this::prepareAndExecute, this::prepareAndExecuteBatch, this::state
+				incomingOps, incomingOpsLimiter, this::prepareAndExecuteBatch, this::state
 			);
 			final var ioWorker = ioWorkerThreadFactory.newThread(ioWorkerTask);
 			ioWorkers.add(ioWorker);
@@ -56,8 +59,9 @@ public abstract class PreemptStorageDriverBase<I extends Item, O extends Operati
 		if(!isStarted()) {
 			throwUnchecked(new EOFException());
 		}
-		final var submitted = incomingOps.offer(op);
+		final var submitted = incomingOpsLimiter.tryAcquire();
 		if(submitted) {
+			incomingOps.add(List.of(op));
 			scheduledOpCount.increment();
 		}
 		return submitted;
@@ -68,26 +72,33 @@ public abstract class PreemptStorageDriverBase<I extends Item, O extends Operati
 		if(!isStarted()) {
 			throwUnchecked(new EOFException());
 		}
-		int i = from;
-		while(i < to && incomingOps.offer(ops.get(i))) {
-			i ++;
+		var n = to - from;
+		if(n > 0) {
+			if(incomingOpsLimiter.tryAcquire(n)) {
+				incomingOps.add(new ArrayList<>(ops).subList(from, to));
+				scheduledOpCount.add(n);
+			} else {
+				n = 0;
+			}
 		}
-		final var n = i - from;
-		scheduledOpCount.add(n);
 		return n;
 	}
 
 	@Override
 	public final int put(final List<O> ops)  {
-		return put(ops, 0, ops.size());
-	}
-
-	final void prepareAndExecute(final O op) {
-		if(prepare(op)) {
-			execute(op);
-		} else {
-			op.status(FAIL_UNKNOWN);
+		if(!isStarted()) {
+			throwUnchecked(new EOFException());
 		}
+		var n = ops.size();
+		if(n > 0) {
+			if(incomingOpsLimiter.tryAcquire(n)) {
+				incomingOps.add(ops);
+				scheduledOpCount.add(n);
+			} else {
+				n = 0;
+			}
+		}
+		return n;
 	}
 
 	final void prepareAndExecuteBatch(final List<O> ops) {
