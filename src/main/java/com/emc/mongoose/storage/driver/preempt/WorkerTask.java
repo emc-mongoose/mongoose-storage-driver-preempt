@@ -41,9 +41,9 @@ implements Runnable {
         Loggers.MSG.debug("{}: started", workerName);
         try {
             while(true) {
-                final var state = stateSupplier.get();
                 final var ops = inQueue.poll();
                 if(null == ops) {
+                    final var state = stateSupplier.get();
                     if(SHUTDOWN.equals(state)) {
                         Loggers.MSG.debug("{}: the state is shutdown and nothing to do more, exit", workerName);
                         break;
@@ -56,7 +56,6 @@ implements Runnable {
                 } else {
                     inQueueLimiter.release(ops.size());
                     batchAction.accept(ops);
-                    //ops.clear();
                 }
             }
         } catch (final Throwable e) {
