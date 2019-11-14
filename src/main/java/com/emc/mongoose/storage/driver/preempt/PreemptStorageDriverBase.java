@@ -72,10 +72,10 @@ public abstract class PreemptStorageDriverBase<I extends Item, O extends Operati
 		if(!isStarted()) {
 			throwUnchecked(new EOFException());
 		}
-		var n = to - from;
+		var n = Math.min(incomingOpsLimiter.availablePermits(), to - from);
 		if(n > 0) {
 			if(incomingOpsLimiter.tryAcquire(n)) {
-				incomingOps.add(new ArrayList<>(ops).subList(from, to));
+				incomingOps.add(new ArrayList<>(ops).subList(from, from + n));
 				scheduledOpCount.add(n);
 			} else {
 				n = 0;
@@ -86,19 +86,7 @@ public abstract class PreemptStorageDriverBase<I extends Item, O extends Operati
 
 	@Override
 	public final int put(final List<O> ops)  {
-		if(!isStarted()) {
-			throwUnchecked(new EOFException());
-		}
-		var n = ops.size();
-		if(n > 0) {
-			if(incomingOpsLimiter.tryAcquire(n)) {
-				incomingOps.add(ops);
-				scheduledOpCount.add(n);
-			} else {
-				n = 0;
-			}
-		}
-		return n;
+		return put(ops, 0, ops.size());
 	}
 
 	final void prepareAndExecuteBatch(final List<O> ops) {
