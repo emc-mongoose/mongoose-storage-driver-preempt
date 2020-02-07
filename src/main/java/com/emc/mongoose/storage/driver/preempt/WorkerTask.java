@@ -42,8 +42,10 @@ implements Runnable {
         try {
             while(true) {
                 final var ops = inQueue.poll();
+                Loggers.MSG.info("queue head is: {}", ops);
                 if(null == ops) {
                     final var state = stateSupplier.get();
+                    Loggers.MSG.info("curent state for queue head {} is {}", ops, state);
                     if(SHUTDOWN.equals(state)) {
                         Loggers.MSG.debug("{}: the state is shutdown and nothing to do more, exit", workerName);
                         break;
@@ -54,6 +56,7 @@ implements Runnable {
                         LockSupport.parkNanos(1);
                     }
                 } else {
+                    Loggers.MSG.info("Semaphore releases operations: {}", ops.size());
                     inQueueLimiter.release(ops.size());
                     batchAction.accept(ops);
                 }
