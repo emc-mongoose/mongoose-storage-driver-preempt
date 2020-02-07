@@ -57,6 +57,8 @@ public abstract class PreemptStorageDriverBase<I extends Item, O extends Operati
 	@Override
 	public final boolean put(final O op)  {
 		if(!isStarted()) {
+			op.status(FAIL_UNKNOWN);
+			Loggers.MSG.info("Failed with unknown status");
 			throwUnchecked(new EOFException());
 		}
 		final var submitted = incomingOpsLimiter.tryAcquire();
