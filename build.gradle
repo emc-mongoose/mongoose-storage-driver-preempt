@@ -34,7 +34,7 @@ ext {
 		confuse            : "1.2.1",
 		javaCommons        : "2.3.6",
 		junit              : "4.12",
-		log4j              : "2.8.2",
+		log4j              : "2.19.0",
 		mongooseBase       : "4.2.16",
 		scala              : "2.12.6",
 		slf4j              : "1.7.25",
