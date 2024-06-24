@@ -74,8 +74,10 @@ public abstract class PreemptStorageDriverBase<I extends Item, O extends Operati
 		}
 		final var availablePermits = incomingOpsLimiter.availablePermits();
 		var n = to - from;
+		Loggers.MSG.info("Processing batch window: from - {}, to - {}, total - {} \n", from, to, n);
 		n = Math.min(availablePermits, n);
 		if(n > 0) {
+			Loggers.MSG.info("Acquiring N operations: {}", n);
 			if(incomingOpsLimiter.tryAcquire(n)) {
 				incomingOps.add(new ArrayList<>(ops).subList(from, from + n));
 				scheduledOpCount.add(n);
@@ -94,6 +96,7 @@ public abstract class PreemptStorageDriverBase<I extends Item, O extends Operati
 	final void prepareAndExecuteBatch(final List<O> ops) {
 		// should copy the ops into the other buffer as far as invoker will clean the source buffer after put(...) exit
 		final var n = ops.size();
+		Loggers.MSG.info("Processing batch size: {}", n);
 		final var opsRangeCopy = new ArrayList<O>(n);
 		O op;
 		for(var i = 0; i < n; i ++) {
@@ -101,6 +104,7 @@ public abstract class PreemptStorageDriverBase<I extends Item, O extends Operati
 			prepare(op);
 			opsRangeCopy.add(op);
 		}
+		Loggers.MSG.info("Batch size has been processed: {}", n);
 		execute(opsRangeCopy);
 	}
 
