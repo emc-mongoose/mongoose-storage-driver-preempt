@@ -145,18 +145,18 @@ public abstract class PreemptStorageDriverBase<I extends Item, O extends Operati
 	@Override
 	protected void doStart() {
 		ioWorkers.forEach(Thread::start);
-		Loggers.MSG.debug("{}: started", toString());
+		Loggers.MSG.info("{}: started", toString());
 	}
 
 	@Override
 	protected void doShutdown() {
-		Loggers.MSG.debug("{}: shut down", toString());
+		Loggers.MSG.info("{}: shut down", toString());
+		incomingOps.clear(); // drop all internally pending load operations
 	}
 
 	@Override
 	protected void doStop()  {
-		Loggers.MSG.debug("{}: interrupting...", toString());
-		incomingOps.clear(); // drop all internally pending load operations
+		Loggers.MSG.info("{}: interrupting...", toString());
 		ioWorkers.forEach(Thread::interrupt);
 	}
 
